@@ -14,4 +14,4 @@ rigid_bodies:
         child_frame_id: Robot_2/base_link
         parent_frame_id: world
 optitrack_config:
-        multicast_address: 224.0.0.1
+        multicast_address: 239.255.42.99
