@@ -27,7 +27,7 @@
 
 // ip on multicast group - cannot be changed in Arena
 const std::string MULTICAST_IP_KEY = "optitrack_config/multicast_address";
-const std::string MULTICAST_IP_DEFAULT = "224.0.0.1";
+const std::string MULTICAST_IP_DEFAULT = "239.255.42.99";
 
 const std::string MOCAP_MODEL_KEY = "mocap_model";
 const std::string RIGID_BODIES_KEY = "rigid_bodies";
@@ -58,6 +58,8 @@ void processMocapData( const char** mocap_model,
       // Parse mocap data
       if( numBytes > 0 )
       {
+        printf("received mocap data...\n");
+
         const char* buffer = multicast_client_socket.getBuffer();
         unsigned short header = *((unsigned short*)(&buffer[0]));
 
@@ -79,6 +81,7 @@ void processMocapData( const char** mocap_model,
 
               if (item != published_rigid_bodies.end())
               {
+                  printf("publishing...\n");
                   item->second.publish(format.model.rigidBodies[i]);
               }
             }
