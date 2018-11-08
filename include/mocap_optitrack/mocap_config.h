@@ -50,6 +50,10 @@
 #include <ros/ros.h>
 #include <tf/transform_broadcaster.h>
 #include "mocap_datapackets.h"
+#include <geometry_msgs/PoseStamped.h>
+#include <qrotor_msgs/RigidBodyState.h>
+
+#include <math.h>
 
 class PublishedRigidBody
 {
@@ -69,12 +73,29 @@ class PublishedRigidBody
   tf::TransformBroadcaster tf_pub;
   ros::Publisher pose_pub;
   ros::Publisher pose2d_pub;
+  ros::Publisher rigidbody_state_pub;
 
   bool validateParam(XmlRpc::XmlRpcValue &, const std::string &);
 
   public:
   PublishedRigidBody(XmlRpc::XmlRpcValue &);
   void publish(RigidBody &);
+  void custom_publish(RigidBody &);
+  void estimate_state(geometry_msgs::PoseStamped &pose);
+
+  // customized 
+  bool IS_INITIALIZED;
+  float dt;
+  float dx_dt, dy_dt, dz_dt;
+
+
+  float tau;
+  float alpha;
+  
+  qrotor_msgs::RigidBodyState state;
+  qrotor_msgs::RigidBodyState state_prev;
+
+
 };
 
 typedef std::map<int, PublishedRigidBody> RigidBodyMap;

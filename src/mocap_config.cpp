@@ -43,6 +43,8 @@
  * Please send comments, questions, or patches to skynet@clearpathrobotics.com 
  *
  */
+#include <ros/ros.h>
+
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Pose2D.h>
 #include <tf/transform_datatypes.h>
@@ -66,6 +68,8 @@ PublishedRigidBody::PublishedRigidBody(XmlRpc::XmlRpcValue &config_node)
   {
     pose_topic = (std::string&) config_node[POSE_TOPIC_PARAM_NAME];
     pose_pub = n.advertise<geometry_msgs::PoseStamped>(pose_topic, 1000);
+    rigidbody_state_pub = n.advertise<qrotor_msgs::RigidBodyState>("/qrotor1/rigidbody_state", 1000);
+
   }
 
   if (publish_pose2d)
@@ -79,6 +83,13 @@ PublishedRigidBody::PublishedRigidBody(XmlRpc::XmlRpcValue &config_node)
     child_frame_id = (std::string&) config_node[CHILD_FRAME_ID_PARAM_NAME];
     parent_frame_id = (std::string&) config_node[PARENT_FRAME_ID_PARAM_NAME];
   }
+
+  // custom code
+  dt = 0.0;
+  IS_INITIALIZED = false;
+  alpha = 1.0;
+  tau  = 0.02;
+
 }
 
 void PublishedRigidBody::publish(RigidBody &body)
@@ -101,6 +112,7 @@ void PublishedRigidBody::publish(RigidBody &body)
   {
     pose.header.frame_id = parent_frame_id;
     pose_pub.publish(pose);
+    rigidbody_state_pub.publish(state);
   }
 
   if (!publish_pose2d && !publish_tf)
@@ -137,6 +149,115 @@ void PublishedRigidBody::publish(RigidBody &body)
     ros::Time timestamp(ros::Time::now());
     tf_pub.sendTransform(tf::StampedTransform(transform, timestamp, parent_frame_id, child_frame_id));
   }
+}
+
+void PublishedRigidBody::estimate_state(geometry_msgs::PoseStamped &pose)
+{
+
+  state.header = pose.header;
+  state.position.x = pose.pose.position.x;
+  state.position.y = pose.pose.position.y;
+  state.position.z = pose.pose.position.z;
+
+  state.attitude.x = pose.pose.orientation.x;
+  state.attitude.y = pose.pose.orientation.y;
+  state.attitude.z = pose.pose.orientation.z;
+  state.attitude.w = pose.pose.orientation.w;
+
+
+  if (IS_INITIALIZED == false)
+  {
+    state.velocity.x = 0.0;
+    state.velocity.y = 0.0;
+    state.velocity.z = 0.0;
+    IS_INITIALIZED = true;
+  }
+  else
+  {
+    dt = state.header.stamp.toSec() - state_prev.header.stamp.toSec();
+    alpha = 1 - exp(-dt/tau);
+    
+    // finite difference
+    dx_dt = (state.position.x - state_prev.position.x)/dt;
+    dy_dt = (state.position.y - state_prev.position.y)/dt;
+    dz_dt = (state.position.z - state_prev.position.z)/dt;
+    
+    state.velocity.x = alpha*dx_dt + (1-alpha)*state_prev.velocity.x;
+    state.velocity.y = alpha*dy_dt + (1-alpha)*state_prev.velocity.y;
+    state.velocity.z = alpha*dz_dt + (1-alpha)*state_prev.velocity.z;
+
+  }
+
+
+
+  // storing state for next iteration
+  state_prev = state;
+
+}
+
+
+void PublishedRigidBody::custom_publish(RigidBody &body)
+{
+  // don't do anything if no new data was provided
+  if (!body.has_data())
+  {
+    return;
+  }
+  // NaN?
+  if (body.pose.position.x != body.pose.position.x)
+  {
+    return;
+  }
+
+  // TODO Below was const, see if there a way to keep it like that.
+  geometry_msgs::PoseStamped pose = body.get_ros_pose();
+  
+  PublishedRigidBody::estimate_state(pose);
+
+  if (publish_pose)
+  {
+    pose.header.frame_id = parent_frame_id;
+    pose_pub.publish(pose);
+    rigidbody_state_pub.publish(state);
+
+  }
+
+  if (!publish_pose2d && !publish_tf)
+  {
+    // nothing to do, bail early
+    return;
+  }
+
+  tf::Quaternion q(pose.pose.orientation.x,
+                   pose.pose.orientation.y,
+                   pose.pose.orientation.z,
+                   pose.pose.orientation.w);
+
+  // publish 2D pose
+  if (publish_pose2d)
+  {
+    geometry_msgs::Pose2D pose2d;
+    pose2d.x = pose.pose.position.x;
+    pose2d.y = pose.pose.position.y;
+    pose2d.theta = tf::getYaw(q);
+    pose2d_pub.publish(pose2d);
+  }
+
+  if (publish_tf)
+  {
+    // publish transform
+    tf::Transform transform;
+    transform.setOrigin( tf::Vector3(pose.pose.position.x,
+                                     pose.pose.position.y,
+                                     pose.pose.position.z));
+
+    // Handle different coordinate systems (Arena vs. rviz)
+    transform.setRotation(q);
+    ros::Time timestamp(ros::Time::now());
+    tf_pub.sendTransform(tf::StampedTransform(transform, timestamp, parent_frame_id, child_frame_id));
+  }
+
+
 }
 
 bool PublishedRigidBody::validateParam(XmlRpc::XmlRpcValue &config_node, const std::string &name)

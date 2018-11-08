@@ -32,9 +32,12 @@
   <build_depend>geometry_msgs</build_depend>
   <build_depend>message_generation</build_depend>
   <build_depend>roslaunch</build_depend>  <!-- for roslaunch_add_file_check -->
+  <build_depend>qrotor_msgs</build_depend>
+
   <run_depend>roscpp</run_depend>
   <run_depend>std_msgs</run_depend>
   <run_depend>geometry_msgs</run_depend>
   <run_depend>tf</run_depend>
   <run_depend>message_runtime</run_depend>
+  <run_depend>qrotor_msgs</run_depend>
 </package>

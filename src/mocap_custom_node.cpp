@@ -58,7 +58,6 @@ void processMocapData( const char** mocap_model,
       // Parse mocap data
       if( numBytes > 0 )
       {
-        // printf("received mocap data...\n");
 
         const char* buffer = multicast_client_socket.getBuffer();
         unsigned short header = *((unsigned short*)(&buffer[0]));
@@ -81,8 +80,7 @@ void processMocapData( const char** mocap_model,
 
               if (item != published_rigid_bodies.end())
               {
-                  // printf("publishing...\n");
-                  item->second.publish(format.model.rigidBodies[i]);
+                  item->second.custom_publish(format.model.rigidBodies[i]);
               }
             }
           }
@@ -107,7 +105,7 @@ int main( int argc, char* argv[] )
 { 
   
   // Initialize ROS node
-  ros::init(argc, argv, "mocap_node");
+  ros::init(argc, argv, "mocap_custom_node");
   ros::NodeHandle n("~");
 
   // Get configuration from ROS parameter server  
